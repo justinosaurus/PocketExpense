@@ -13,6 +13,10 @@ flutter run
 
 On an Android device, enable USB debugging and select it with `flutter devices`. To run the tests, use `flutter test`; to make a local release-mode APK, use `flutter build apk --release`.
 
+### Build APKs on GitHub
+
+GitHub Actions builds debug and release-mode APKs when code is pushed to `main` or `development`, and for pull requests targeting `main`. To start a build manually, open the repository's **Actions** tab and run **Android build**. When it finishes, open the run and download the `pocket-expenses-apks` artifact. The debug APK installs as a separate app. The release-mode APK uses the fallback debug signing key and is for testing; it is not ready for Google Play. Artifacts are kept for 14 days.
+
 ## Accounts and imports
 
 The app starts with Cash on Hand, GCash, and Savings Account. On **Accounts**, add other money accounts, enter a starting balance with **Adjust balance → Add money**, record cash withdrawals with **Take out**, and move funds with **Transfer**. Transfers update both accounts without changing the combined balance. New and edited expenses include a **Paid from** account.
