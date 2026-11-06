@@ -38,7 +38,31 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug
 
-      - name: Build release-mode APK
+      - name: Prepare Android signing key
+        id: signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          if [[ -z "$ANDROID_KEYSTORE_BASE64" || -z "$ANDROID_KEY_ALIAS" || -z "$ANDROID_KEY_PASSWORD" || -z "$ANDROID_STORE_PASSWORD" ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets are not configured; skipping the release APK."
+            exit 0
+          fi
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
+          {
+            printf 'storePassword=%s\n' "$ANDROID_STORE_PASSWORD"
+            printf 'keyPassword=%s\n' "$ANDROID_KEY_PASSWORD"
+            printf 'keyAlias=%s\n' "$ANDROID_KEY_ALIAS"
+            printf 'storeFile=upload-keystore.jks\n'
+          } > android/key.properties
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed release APK
+        if: steps.signing.outputs.enabled == 'true'
         run: flutter build apk --release
 
       - name: Upload APKs

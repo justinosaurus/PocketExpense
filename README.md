@@ -15,7 +15,7 @@ On an Android device, enable USB debugging and select it with `flutter devices`.
 
 ### Build APKs on GitHub
 
-GitHub Actions builds debug and release-mode APKs when code is pushed to `main` or `development`, and for pull requests targeting `main`. To start a build manually, open the repository's **Actions** tab and run **Android build**. When it finishes, open the run and download the `pocket-expenses-apks` artifact. The debug APK installs as a separate app. The release-mode APK uses the fallback debug signing key and is for testing; it is not ready for Google Play. Artifacts are kept for 14 days.
+GitHub Actions builds a debug APK when code is pushed to `main` or `development`, and for pull requests targeting `main`. To also build a signed release APK, create an upload keystore and add these repository Actions secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, and `ANDROID_STORE_PASSWORD`. Encode the keystore file as one line of Base64 for `ANDROID_KEYSTORE_BASE64`. To start a build manually, open the repository's **Actions** tab and run **Android build**. When it finishes, download the `pocket-expenses-apks` artifact. The debug APK installs as a separate app; the signed release APK can be attached to a GitHub Release. Keep the keystore and passwords backed up privately. Artifacts are kept for 14 days.
 
 ## Accounts and imports
 
