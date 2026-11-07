@@ -17,4 +17,9 @@ void main() {
         AccountBalance.calculate(expenses: 0, incoming: 200, outgoing: 0);
     expect(source + destination, 0);
   });
+
+  test('income adds to the account balance', () {
+    expect(AccountBalance.calculate(expenses: 120, incoming: 450, outgoing: 50),
+        280);
+  });
 }

@@ -2,13 +2,18 @@ import 'dart:typed_data';
 
 import 'package:excel/excel.dart';
 
+import '../../accounts/domain/money_account.dart';
 import '../domain/expense.dart';
 import '../domain/expense_category.dart';
 
 class ExpenseExcelExporter {
   const ExpenseExcelExporter();
 
-  Uint8List encode(Iterable<Expense> expenses, Map<int, String> accountNames) {
+  Uint8List encode(
+    Iterable<Expense> expenses,
+    Map<int, String> accountNames, {
+    Iterable<MoneyAccount> accounts = const [],
+  }) {
     final workbook = Excel.createExcel();
     workbook.rename('Sheet1', 'Expenses');
     final sheet = workbook['Expenses'];
@@ -46,6 +51,25 @@ class ExpenseExcelExporter {
               .value = value;
         }
       }
+      rowIndex++;
+    }
+
+    final accountsSheet = workbook['Accounts'];
+    const accountHeaders = ['Account', 'Current Balance'];
+    for (var column = 0; column < accountHeaders.length; column++) {
+      accountsSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: column, rowIndex: 0))
+          .value = TextCellValue(accountHeaders[column]);
+      accountsSheet.setColumnAutoFit(column);
+    }
+    rowIndex = 1;
+    for (final account in accounts) {
+      accountsSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: rowIndex))
+          .value = TextCellValue(account.name);
+      accountsSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: rowIndex))
+          .value = DoubleCellValue(account.balance);
       rowIndex++;
     }
 

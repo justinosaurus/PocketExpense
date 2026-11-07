@@ -97,12 +97,10 @@ class AccountsPage extends StatelessWidget {
   }
 
   Future<void> _openAction(BuildContext context,
-      {required bool transfer, int? accountId}) async {
+      {required AccountActionType action, int? accountId}) async {
     final saved = await Navigator.of(context).push<bool>(MaterialPageRoute(
       builder: (_) => AccountActionPage(
-          controller: controller,
-          transfer: transfer,
-          initialAccountId: accountId),
+          controller: controller, action: action, initialAccountId: accountId),
     ));
     if (saved == true) await controller.load();
   }
@@ -153,18 +151,20 @@ class AccountsPage extends StatelessWidget {
                                           fontWeight: FontWeight.bold)),
                               const SizedBox(height: 8),
                               const Text(
-                                  'Balances update with expenses, transfers, and adjustments.',
+                                  'Balances update with expenses, income, transfers, and adjustments.',
                                   style: TextStyle(color: Colors.white70)),
                             ]),
                       )),
                   const SizedBox(height: 14),
                   Wrap(spacing: 8, runSpacing: 8, children: [
                     OutlinedButton.icon(
-                        onPressed: () => _openAction(context, transfer: true),
+                        onPressed: () => _openAction(context,
+                            action: AccountActionType.transfer),
                         icon: const Icon(Icons.swap_horiz),
                         label: const Text('Transfer')),
                     OutlinedButton.icon(
-                        onPressed: () => _openAction(context, transfer: false),
+                        onPressed: () => _openAction(context,
+                            action: AccountActionType.adjustment),
                         icon: const Icon(Icons.tune),
                         label: const Text('Adjust balance')),
                     OutlinedButton.icon(
@@ -179,7 +179,8 @@ class AccountsPage extends StatelessWidget {
                   ...controller.accounts.map((account) => _AccountCard(
                       account: account,
                       onAdjust: () => _openAction(context,
-                          transfer: false, accountId: account.id),
+                          action: AccountActionType.adjustment,
+                          accountId: account.id),
                       onRemove: () => _removeAccount(context, account))),
                   const SizedBox(height: 20),
                   Text('Recent money movements',
@@ -191,7 +192,7 @@ class AccountsPage extends StatelessWidget {
                             icon: Icons.swap_horiz,
                             title: 'No movements yet',
                             message:
-                                'Transfers and balance adjustments will appear here.'))
+                                'Income, transfers, and balance adjustments will appear here.'))
                   else
                     ...controller.movements
                         .take(12)
@@ -274,8 +275,11 @@ class _MovementTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title =
-        movement.type == 'transfer' ? 'Transfer' : 'Balance adjustment';
+    final title = switch (movement.type) {
+      'transfer' => 'Transfer',
+      'income' => 'Income',
+      _ => 'Balance adjustment',
+    };
     final route = movement.type == 'transfer'
         ? '${movement.fromName ?? 'Account'} → ${movement.toName ?? 'Account'}'
         : movement.toName != null
@@ -285,7 +289,11 @@ class _MovementTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 6),
         child: ListTile(
           leading: Icon(
-              movement.type == 'transfer' ? Icons.swap_horiz : Icons.tune,
+              movement.type == 'transfer'
+                  ? Icons.swap_horiz
+                  : movement.type == 'income'
+                      ? Icons.trending_up
+                      : Icons.tune,
               color: Theme.of(context).colorScheme.primary),
           title: Text(title),
           subtitle: Text(

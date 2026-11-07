@@ -6,6 +6,7 @@ import 'package:pocket_expenses/features/expenses/data/expense_excel_importer.da
 import 'package:pocket_expenses/features/expenses/data/expense_excel_exporter.dart';
 import 'package:pocket_expenses/features/expenses/domain/expense.dart';
 import 'package:pocket_expenses/features/expenses/domain/expense_category.dart';
+import 'package:pocket_expenses/features/accounts/domain/money_account.dart';
 
 void main() {
   test('keeps historical rows with a blank date or amount', () {
@@ -64,7 +65,9 @@ void main() {
           importKey: 'pocket-expense:sample')
     ], {
       7: 'GCash'
-    });
+    }, accounts: const [
+      MoneyAccount(id: 7, name: 'GCash', balance: 450.25)
+    ]);
 
     final preview = const ExpenseExcelImporter().parse(bytes);
     expect(preview.rows, hasLength(1));
@@ -75,5 +78,22 @@ void main() {
     expect(row.accountName, 'GCash');
     expect(row.expense.note, 'Bus fare');
     expect(row.expense.importKey, 'pocket-expense:sample');
+    expect(preview.accounts, hasLength(1));
+    expect(preview.accounts.single.name, 'GCash');
+    expect(preview.accounts.single.balance, 450.25);
+  });
+
+  test('imports account balances without requiring expense rows', () {
+    final bytes =
+        const ExpenseExcelExporter().encode(const [], const {}, accounts: [
+      const MoneyAccount(id: 4, name: 'Cash on Hand', balance: -15.75),
+    ]);
+
+    final preview = const ExpenseExcelImporter().parse(bytes);
+
+    expect(preview.rows, isEmpty);
+    expect(preview.accounts, hasLength(1));
+    expect(preview.accounts.single.name, 'Cash on Hand');
+    expect(preview.accounts.single.balance, -15.75);
   });
 }

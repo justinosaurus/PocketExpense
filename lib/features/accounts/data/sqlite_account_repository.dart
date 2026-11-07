@@ -115,6 +115,62 @@ class SqliteAccountRepository implements AccountRepository {
   }
 
   @override
+  Future<void> recordIncome(
+      {required int accountId,
+      required double amount,
+      required DateTime date,
+      String? note}) async {
+    if (!amount.isFinite || amount <= 0) {
+      throw ArgumentError('Enter an amount greater than zero.');
+    }
+    await (await _appDatabase.database).insert('account_movements', {
+      'type': 'income',
+      'to_account_id': accountId,
+      'amount': amount,
+      'date': _dateOnly(date),
+      'note': note?.trim().isEmpty == true ? null : note?.trim(),
+    });
+  }
+
+  @override
+  Future<void> syncAccountBalance(
+      {required int accountId,
+      required double balance,
+      required DateTime date}) async {
+    if (!balance.isFinite) {
+      throw ArgumentError('The imported balance is not a valid amount.');
+    }
+    final db = await _appDatabase.database;
+    await db.transaction((txn) async {
+      final account = await txn.query('accounts',
+          columns: ['id'], where: 'id = ?', whereArgs: [accountId], limit: 1);
+      if (account.isEmpty) throw StateError('This account no longer exists.');
+      final rows = await txn.rawQuery('''
+        SELECT
+          COALESCE((SELECT SUM(amount) FROM expenses WHERE account_id = ?), 0) AS expenses,
+          COALESCE((SELECT SUM(amount) FROM account_movements WHERE to_account_id = ?), 0) AS incoming,
+          COALESCE((SELECT SUM(amount) FROM account_movements WHERE from_account_id = ?), 0) AS outgoing
+      ''', [accountId, accountId, accountId]);
+      final row = rows.single;
+      final currentBalance = AccountBalance.calculate(
+        expenses: (row['expenses'] as num).toDouble(),
+        incoming: (row['incoming'] as num).toDouble(),
+        outgoing: (row['outgoing'] as num).toDouble(),
+      );
+      final change = balance - currentBalance;
+      if (change.abs() < 0.00000001) return;
+      await txn.insert('account_movements', {
+        'type': 'adjustment',
+        'from_account_id': change < 0 ? accountId : null,
+        'to_account_id': change > 0 ? accountId : null,
+        'amount': change.abs(),
+        'date': _dateOnly(date),
+        'note': 'Imported balance sync',
+      });
+    });
+  }
+
+  @override
   Future<void> transfer(
       {required int fromAccountId,
       required int toAccountId,

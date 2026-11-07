@@ -39,6 +39,8 @@ class FakeExpenseRepository implements ExpenseRepository {
 class FakeAccountRepository implements AccountRepository {
   bool blockRemoval = false;
   int deleteCalls = 0;
+  ({int accountId, double amount, DateTime date, String? note})? lastIncome;
+  ({int accountId, double balance})? lastBalanceSync;
   @override
   Future<List<MoneyAccount>> getAccounts() async => const [
         MoneyAccount(id: 1, name: 'Cash on Hand', balance: 0),
@@ -47,7 +49,17 @@ class FakeAccountRepository implements AccountRepository {
       ];
 
   @override
-  Future<List<AccountMovement>> getMovements() async => const [];
+  Future<List<AccountMovement>> getMovements() async => lastIncome == null
+      ? const []
+      : [
+          AccountMovement(
+              id: 1,
+              type: 'income',
+              amount: lastIncome!.amount,
+              date: lastIncome!.date,
+              toName: 'Cash on Hand',
+              note: lastIncome!.note)
+        ];
 
   @override
   Future<int> addAccount(String name) async => 4;
@@ -69,6 +81,23 @@ class FakeAccountRepository implements AccountRepository {
       String? note}) async {}
 
   @override
+  Future<void> recordIncome(
+      {required int accountId,
+      required double amount,
+      required DateTime date,
+      String? note}) async {
+    lastIncome = (accountId: accountId, amount: amount, date: date, note: note);
+  }
+
+  @override
+  Future<void> syncAccountBalance(
+      {required int accountId,
+      required double balance,
+      required DateTime date}) async {
+    lastBalanceSync = (accountId: accountId, balance: balance);
+  }
+
+  @override
   Future<void> transfer(
       {required int fromAccountId,
       required int toAccountId,
@@ -87,6 +116,7 @@ void main() {
         controller: controller, accountController: accountController));
     await tester.pumpAndSettle();
 
+    expect(find.text('Add income'), findsOneWidget);
     expect(find.text('Add expense'), findsOneWidget);
     expect(find.text('Overview'), findsOneWidget);
   });
@@ -109,6 +139,26 @@ void main() {
     await tester.scrollUntilVisible(find.text('Recent money movements'), 200);
     await tester.pumpAndSettle();
     expect(find.text('Undo latest'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('income is recorded for the selected account',
+      (WidgetTester tester) async {
+    final repository = FakeAccountRepository();
+    final controller = AccountController(repository);
+    final expenseController = ExpenseController(FakeExpenseRepository());
+    await tester.pumpWidget(ExpenseApp(
+        controller: expenseController, accountController: controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add income'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Amount'), '125');
+    await tester.tap(find.widgetWithText(FilledButton, 'Record income').last);
+    await tester.pumpAndSettle();
+
+    expect(repository.lastIncome?.accountId, 1);
+    expect(repository.lastIncome?.amount, 125);
     expect(tester.takeException(), isNull);
   });
 

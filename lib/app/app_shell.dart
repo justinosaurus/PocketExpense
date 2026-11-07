@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../features/accounts/presentation/account_action_page.dart';
 import '../features/accounts/presentation/account_controller.dart';
 import '../features/accounts/presentation/accounts_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
@@ -62,6 +63,18 @@ class _AppShellState extends State<AppShell> {
     if (saved == true && mounted) setState(() => _index = 1);
   }
 
+  Future<void> _addIncome() async {
+    if (widget.accountController.accounts.isEmpty) {
+      await widget.accountController.load();
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push<bool>(MaterialPageRoute(
+      builder: (_) => AccountActionPage(
+          controller: widget.accountController,
+          action: AccountActionType.income),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -75,10 +88,23 @@ class _AppShellState extends State<AppShell> {
     ];
     return Scaffold(
       body: SafeArea(child: IndexedStack(index: _index, children: pages)),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addExpense,
-        icon: const Icon(Icons.add),
-        label: const Text('Add expense'),
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'add-income',
+            onPressed: _addIncome,
+            icon: const Icon(Icons.trending_up),
+            label: const Text('Add income'),
+          ),
+          const SizedBox(width: 10),
+          FloatingActionButton.extended(
+            heroTag: 'add-expense',
+            onPressed: _addExpense,
+            icon: const Icon(Icons.add),
+            label: const Text('Add expense'),
+          ),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,

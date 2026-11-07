@@ -57,6 +57,18 @@ class AppDatabase {
               where: 'id = ?', whereArgs: [expense['id']]);
         }
       }
+      if (oldVersion < 6) {
+        await db.execute(
+            'ALTER TABLE account_movements RENAME TO account_movements_before_income');
+        await _createMovementsTable(db);
+        await db.execute('''
+          INSERT INTO account_movements
+            (id, type, from_account_id, to_account_id, amount, date, note)
+          SELECT id, type, from_account_id, to_account_id, amount, date, note
+          FROM account_movements_before_income
+        ''');
+        await db.execute('DROP TABLE account_movements_before_income');
+      }
     });
     return _database!;
   }
@@ -82,7 +94,7 @@ class AppDatabase {
   static Future<void> _createMovementsTable(Database db) async {
     await db.execute('''CREATE TABLE account_movements (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      type TEXT NOT NULL CHECK(type IN ('transfer', 'adjustment')),
+      type TEXT NOT NULL CHECK(type IN ('transfer', 'adjustment', 'income')),
       from_account_id INTEGER REFERENCES accounts(id),
       to_account_id INTEGER REFERENCES accounts(id),
       amount REAL NOT NULL CHECK(amount > 0),

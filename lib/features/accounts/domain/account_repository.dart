@@ -12,6 +12,15 @@ abstract interface class AccountRepository {
       required double change,
       required DateTime date,
       String? note});
+  Future<void> recordIncome(
+      {required int accountId,
+      required double amount,
+      required DateTime date,
+      String? note});
+  Future<void> syncAccountBalance(
+      {required int accountId,
+      required double balance,
+      required DateTime date});
   Future<void> transfer(
       {required int fromAccountId,
       required int toAccountId,
