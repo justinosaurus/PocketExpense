@@ -13,9 +13,9 @@ flutter run
 
 On an Android device, enable USB debugging and select it with `flutter devices`. To run the tests, use `flutter test`; to make a local release-mode APK, use `flutter build apk --release`.
 
-### Build APKs on GitHub
+### Build and release APKs on GitHub
 
-GitHub Actions builds a debug APK when code is pushed to `main` or `development`, and for pull requests targeting `main`. To also build a signed release APK, create an upload keystore and add these repository Actions secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, and `ANDROID_STORE_PASSWORD`. Encode the keystore file as one line of Base64 for `ANDROID_KEYSTORE_BASE64`. To start a build manually, open the repository's **Actions** tab and run **Android build**. When it finishes, download the `pocket-expenses-apks` artifact. The debug APK installs as a separate app; the signed release APK can be attached to a GitHub Release. Keep the keystore and passwords backed up privately. Artifacts are kept for 14 days.
+The **Android build** workflow runs manually and creates a draft GitHub Release with signed, split APKs attached directly as separate assets. Before running it, create an upload keystore and add these repository Actions secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, and `ANDROID_STORE_PASSWORD`. Encode the keystore file as one line of Base64 for `ANDROID_KEYSTORE_BASE64`. In **Actions → Android build → Run workflow**, enter a release tag such as `v0.1.0`. When the workflow completes, open **Releases → Drafts**, review the generated release and APK assets, then publish it. Keep the keystore and passwords backed up privately.
 
 ## Accounts and imports
 

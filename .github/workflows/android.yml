@@ -2,9 +2,15 @@ name: Android build
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to create (for example, v0.1.0)
+        required: true
+        default: v0.1.0
+        type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -31,9 +37,6 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build debug APK
-        run: flutter build apk --debug
-
       - name: Prepare Android signing key
         id: signing
         env:
@@ -43,9 +46,8 @@ jobs:
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
         run: |
           if [[ -z "$ANDROID_KEYSTORE_BASE64" || -z "$ANDROID_KEY_ALIAS" || -z "$ANDROID_KEY_PASSWORD" || -z "$ANDROID_STORE_PASSWORD" ]]; then
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "Signing secrets are not configured; skipping the release APK."
-            exit 0
+            echo "::error::Configure all Android signing secrets before creating a release."
+            exit 1
           fi
 
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
@@ -55,16 +57,18 @@ jobs:
             printf 'keyAlias=%s\n' "$ANDROID_KEY_ALIAS"
             printf 'storeFile=upload-keystore.jks\n'
           } > android/key.properties
-          echo "enabled=true" >> "$GITHUB_OUTPUT"
 
       - name: Build signed release APK
-        if: steps.signing.outputs.enabled == 'true'
-        run: flutter build apk --release
+        run: flutter build apk --release --split-per-abi
 
-      - name: Upload APKs
-        uses: actions/upload-artifact@v7
-        with:
-          name: pocket-expenses-apks
-          path: build/app/outputs/flutter-apk/*.apk
-          if-no-files-found: error
-          retention-days: 14
+      - name: Create draft GitHub Release with APKs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            build/app/outputs/flutter-apk/*-release.apk \
+            --draft \
+            --title "$RELEASE_TAG" \
+            --generate-notes \
+            --target "$GITHUB_SHA"
