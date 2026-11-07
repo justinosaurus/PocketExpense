@@ -74,6 +74,25 @@ class AccountController extends ChangeNotifier {
     await load();
   }
 
+  Future<void> recordIncome(
+      {required int accountId,
+      required double amount,
+      required DateTime date,
+      String? note}) async {
+    await _repository.recordIncome(
+        accountId: accountId, amount: amount, date: date, note: note);
+    await load();
+  }
+
+  Future<void> syncAccountBalance(
+      {required int accountId,
+      required double balance,
+      required DateTime date}) async {
+    await _repository.syncAccountBalance(
+        accountId: accountId, balance: balance, date: date);
+    await load();
+  }
+
   Future<void> transfer(
       {required int fromAccountId,
       required int toAccountId,

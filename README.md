@@ -13,11 +13,15 @@ flutter run
 
 On an Android device, enable USB debugging and select it with `flutter devices`. To run the tests, use `flutter test`; to make a local release-mode APK, use `flutter build apk --release`.
 
+### Build APKs on GitHub
+
+GitHub Actions builds a debug APK when code is pushed to `main` or `development`, and for pull requests targeting `main`. To also build a signed release APK, create an upload keystore and add these repository Actions secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, and `ANDROID_STORE_PASSWORD`. Encode the keystore file as one line of Base64 for `ANDROID_KEYSTORE_BASE64`. To start a build manually, open the repository's **Actions** tab and run **Android build**. When it finishes, download the `pocket-expenses-apks` artifact. The debug APK installs as a separate app; the signed release APK can be attached to a GitHub Release. Keep the keystore and passwords backed up privately. Artifacts are kept for 14 days.
+
 ## Accounts and imports
 
-The app starts with Cash on Hand, GCash, and Savings Account. On **Accounts**, add other money accounts, enter a starting balance with **Adjust balance → Add money**, record cash withdrawals with **Take out**, and move funds with **Transfer**. Transfers update both accounts without changing the combined balance. New and edited expenses include a **Paid from** account.
+The app starts with Cash on Hand, GCash, and Savings Account. Use **Add income** beside **Add expense** to record money received into an account. On **Accounts**, add other money accounts, enter or correct a starting balance with **Adjust balance → Add money**, record cash withdrawals with **Take out**, and move funds with **Transfer**. Income and adjustments appear separately in the movement history. Transfers update both accounts without changing the combined balance. New and edited expenses include a **Paid from** account.
 
-On **History**, choose **Import** to load an `.xlsx` expense sheet or **Export** to save the app's records as an `.xlsx` spreadsheet. The importer recognizes common headings (date, amount, category, paid from/account, and note/purpose/description), and the organized Finance workbook's Transactions sheet. Exported rows retain their account name and unique import key, so importing the same export again does not duplicate them. Existing account names are matched automatically; the app asks you to choose an account for rows whose account is missing or unknown. Historical rows with a blank date or amount are retained and can be completed by editing them. Invalid amounts and fully blank rows are skipped. New expenses still require an amount greater than zero.
+On **History**, choose **Import** to load an `.xlsx` expense sheet or **Export** to save the app's records as an `.xlsx` spreadsheet. The importer recognizes common headings (date, amount, category, paid from/account, and note/purpose/description), and the organized Finance workbook's Transactions sheet. Exports include an **Accounts** sheet with each account's current balance as well as expense records. Import matches accounts by name, creates accounts that are missing on the device, and synchronizes their balances to the workbook snapshot; importing that same snapshot again does not add the balance twice. Exported expense rows retain their account name and unique import key, so importing the same export again does not duplicate them. The app asks you to choose an account for expense rows whose account is missing or unknown. Historical rows with a blank date or amount are retained and can be completed by editing them. Invalid amounts and fully blank rows are skipped. New expenses still require an amount greater than zero.
 
 Account removal is blocked when the account is referenced by an expense, transfer, or balance adjustment. The app explains why and will not delete it. The **Undo latest** action has been removed so recorded movements cannot be silently reversed.
 
@@ -44,6 +48,7 @@ The project can build a release-mode APK locally. Without a private upload key, 
 - `excel`: read the workbook locally without uploading it.
 - `flutter_lints`: standard Flutter static analysis rules.
 - State management uses Flutter's built in `ChangeNotifier`, so no state package is needed.
+- Database version 6 expands the allowed account movement types to include income. The migration rebuilds the movement table while preserving existing transfers, adjustments, IDs, and notes.
 
 ## Extend it
 

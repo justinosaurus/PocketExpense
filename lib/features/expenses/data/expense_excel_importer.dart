@@ -12,11 +12,22 @@ class ExpenseImportRow {
   final String? accountName;
 }
 
+class AccountImportRow {
+  const AccountImportRow({required this.name, required this.balance});
+
+  final String name;
+  final double balance;
+}
+
 class ExpenseImportPreview {
-  const ExpenseImportPreview({required this.rows, required this.skippedRows});
+  const ExpenseImportPreview(
+      {required this.rows,
+      required this.skippedRows,
+      this.accounts = const []});
 
   final List<ExpenseImportRow> rows;
   final int skippedRows;
+  final List<AccountImportRow> accounts;
 }
 
 /// Reads both this app's exports and common personal finance workbook layouts.
@@ -25,14 +36,97 @@ class ExpenseExcelImporter {
 
   ExpenseImportPreview parse(Uint8List bytes) {
     final workbook = Excel.decodeBytes(bytes);
+    Sheet? accountsSheet;
+    for (final entry in workbook.tables.entries) {
+      if (_normalize(entry.key) == 'accounts') {
+        accountsSheet = entry.value;
+        break;
+      }
+    }
+    final accounts = accountsSheet == null
+        ? const _AccountSheetParse(rows: [], skippedRows: 0)
+        : _parseAccounts(accountsSheet);
     final sheets = workbook.tables.entries.toList()
       ..sort((a, b) => _sheetPriority(a.key).compareTo(_sheetPriority(b.key)));
     for (final entry in sheets) {
       final parsed = _parseSheet(entry.value);
-      if (parsed != null) return parsed;
+      if (parsed != null) {
+        return ExpenseImportPreview(
+            rows: parsed.rows,
+            skippedRows: parsed.skippedRows + accounts.skippedRows,
+            accounts: accounts.rows);
+      }
+    }
+    if (accounts.rows.isNotEmpty) {
+      return ExpenseImportPreview(
+          rows: const [],
+          skippedRows: accounts.skippedRows,
+          accounts: accounts.rows);
     }
     throw const FormatException(
-        'No expense sheet found. Include columns such as Amount, Date, Note, or Purpose.');
+        'No expense records or account balances were found. Include an expense sheet or an Accounts sheet with account names and balances.');
+  }
+
+  _AccountSheetParse _parseAccounts(Sheet sheet) {
+    final rows = sheet.rows;
+    var headerIndex = -1;
+    var nameColumn = -1;
+    var balanceColumn = -1;
+    for (var index = 0; index < rows.length && index < 30; index++) {
+      final headers = rows[index].map(_cellText).toList();
+      for (var column = 0; column < headers.length; column++) {
+        switch (_normalize(headers[column] ?? '')) {
+          case 'account':
+          case 'accountname':
+          case 'name':
+            nameColumn = column;
+            break;
+          case 'balance':
+          case 'currentbalance':
+          case 'availablebalance':
+            balanceColumn = column;
+            break;
+        }
+      }
+      if (nameColumn >= 0 && balanceColumn >= 0) {
+        headerIndex = index;
+        break;
+      }
+      nameColumn = -1;
+      balanceColumn = -1;
+    }
+    if (headerIndex < 0) {
+      return const _AccountSheetParse(rows: [], skippedRows: 0);
+    }
+
+    final parsed = <AccountImportRow>[];
+    final seenNames = <String>{};
+    var skipped = 0;
+    for (var rowIndex = headerIndex + 1; rowIndex < rows.length; rowIndex++) {
+      final row = rows[rowIndex];
+      final name = _cellText(_at(row, nameColumn))?.trim();
+      final rawBalance = _cellText(_at(row, balanceColumn))?.trim();
+      if ((name == null || name.isEmpty) &&
+          (rawBalance == null || rawBalance.isEmpty)) {
+        continue;
+      }
+      final balance = _cellNumber(_at(row, balanceColumn));
+      if (name == null ||
+          name.isEmpty ||
+          name.length > 32 ||
+          balance == null ||
+          !balance.isFinite) {
+        skipped++;
+        continue;
+      }
+      final key = _normalize(name);
+      if (!seenNames.add(key)) {
+        throw FormatException(
+            'Duplicate account name in Accounts sheet: $name');
+      }
+      parsed.add(AccountImportRow(name: name, balance: balance));
+    }
+    return _AccountSheetParse(rows: parsed, skippedRows: skipped);
   }
 
   int _sheetPriority(String name) {
@@ -237,4 +331,11 @@ class ExpenseExcelImporter {
 
   String _dateKey(DateTime date) =>
       '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+}
+
+class _AccountSheetParse {
+  const _AccountSheetParse({required this.rows, required this.skippedRows});
+
+  final List<AccountImportRow> rows;
+  final int skippedRows;
 }

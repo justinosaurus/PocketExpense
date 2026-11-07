@@ -59,11 +59,11 @@ class _ExpenseHistoryPageState extends State<ExpenseHistoryPage> {
       setState(() => _importing = true);
       final preview =
           const ExpenseExcelImporter().parse(await file.readAsBytes());
-      if (preview.rows.isEmpty) {
+      if (preview.rows.isEmpty && preview.accounts.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text(
-                  'No expense records were found. ${preview.skippedRows} invalid rows were skipped.')));
+                  'No valid expense records or account balances were found. ${preview.skippedRows} invalid rows were skipped.')));
         }
         return;
       }
@@ -71,26 +71,56 @@ class _ExpenseHistoryPageState extends State<ExpenseHistoryPage> {
           .where(
               (row) => row.expense.date == null || row.expense.amount == null)
           .length;
-      final unmatched = preview.rows.where((row) =>
-          row.accountName == null ||
-          _accountIdForName(row.accountName!) == null);
-      final fallbackCount = unmatched.length;
-      final fallbackAccountId = fallbackCount == 0
+      final importedAccountNames = preview.accounts
+          .map((account) => account.name.trim().toLowerCase())
+          .toSet();
+      final fallbackCount = preview.rows.where((row) {
+        final name = row.accountName?.trim();
+        return name == null ||
+            name.isEmpty ||
+            (_accountIdForName(name) == null &&
+                !importedAccountNames.contains(name.toLowerCase()));
+      }).length;
+      final fallbackAccountId = fallbackCount == 0 || preview.rows.isEmpty
           ? widget.accountController.accounts.first.id
           : await _chooseImportAccount(fallbackCount);
       if (fallbackAccountId == null || !mounted) return;
+
+      var createdAccounts = 0;
+      for (final account in preview.accounts) {
+        if (_accountIdForName(account.name) == null) {
+          await widget.accountController.addAccount(account.name);
+          createdAccounts++;
+        }
+      }
       final expenses = preview.rows
           .map((row) => row.expense.copyWith(
               accountId: _accountIdForName(row.accountName ?? '') ??
                   fallbackAccountId))
           .toList();
-      final result = await widget.controller.importExpenses(expenses);
+      final result = expenses.isEmpty
+          ? (imported: 0, duplicates: 0)
+          : await widget.controller.importExpenses(expenses);
+      if (preview.accounts.isNotEmpty) {
+        await widget.accountController.load();
+        for (final account in preview.accounts) {
+          final accountId = _accountIdForName(account.name);
+          if (accountId == null) {
+            throw StateError(
+                'Could not find imported account ${account.name}.');
+          }
+          await widget.accountController.syncAccountBalance(
+              accountId: accountId,
+              balance: account.balance,
+              date: DateTime.now());
+        }
+      }
       if (mounted) {
         setState(() => _accountId =
             fallbackCount == preview.rows.length ? fallbackAccountId : null);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
-                'Imported ${result.imported} records. ${result.duplicates} already existed; $incomplete need a date or amount; ${preview.skippedRows} invalid rows skipped.')));
+                'Imported ${result.imported} records. ${result.duplicates} already existed; synced ${preview.accounts.length} account balances and created $createdAccounts accounts; $incomplete records need a date or amount; ${preview.skippedRows} invalid rows skipped.')));
       }
     } on FormatException catch (error) {
       if (mounted) {
@@ -121,11 +151,13 @@ class _ExpenseHistoryPageState extends State<ExpenseHistoryPage> {
     if (_importing) return;
     setState(() => _importing = true);
     try {
-      final bytes =
-          const ExpenseExcelExporter().encode(widget.controller.expenses, {
-        for (final account in widget.accountController.accounts)
-          account.id: account.name
-      });
+      final bytes = const ExpenseExcelExporter().encode(
+          widget.controller.expenses,
+          {
+            for (final account in widget.accountController.accounts)
+              account.id: account.name
+          },
+          accounts: widget.accountController.accounts);
       final saved = await FilePicker.saveFile(
           fileName: 'pocket_expenses.xlsx',
           bytes: bytes,

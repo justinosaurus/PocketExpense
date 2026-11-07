@@ -5,14 +5,16 @@ import '../../../shared/widgets/money_text.dart';
 import '../domain/money_account.dart';
 import 'account_controller.dart';
 
+enum AccountActionType { transfer, adjustment, income }
+
 class AccountActionPage extends StatefulWidget {
   const AccountActionPage(
       {super.key,
       required this.controller,
-      required this.transfer,
+      required this.action,
       this.initialAccountId});
   final AccountController controller;
-  final bool transfer;
+  final AccountActionType action;
   final int? initialAccountId;
 
   @override
@@ -23,6 +25,7 @@ class _AccountActionPageState extends State<AccountActionPage> {
   final _formKey = GlobalKey<FormState>();
   final _amount = TextEditingController();
   final _note = TextEditingController();
+  late int _accountId;
   late int _fromAccountId;
   late int _toAccountId;
   bool _adding = true;
@@ -36,6 +39,7 @@ class _AccountActionPageState extends State<AccountActionPage> {
     super.initState();
     final first =
         widget.initialAccountId ?? (_accounts.isEmpty ? 1 : _accounts.first.id);
+    _accountId = first;
     _fromAccountId = first;
     final otherAccounts =
         _accounts.where((account) => account.id != first).toList();
@@ -54,19 +58,26 @@ class _AccountActionPageState extends State<AccountActionPage> {
     setState(() => _saving = true);
     final amount = double.parse(_amount.text.trim());
     try {
-      if (widget.transfer) {
-        await widget.controller.transfer(
-            fromAccountId: _fromAccountId,
-            toAccountId: _toAccountId,
-            amount: amount,
-            date: _date,
-            note: _note.text.trim());
-      } else {
-        await widget.controller.adjust(
-            accountId: _fromAccountId,
-            change: _adding ? amount : -amount,
-            date: _date,
-            note: _note.text.trim());
+      switch (widget.action) {
+        case AccountActionType.transfer:
+          await widget.controller.transfer(
+              fromAccountId: _fromAccountId,
+              toAccountId: _toAccountId,
+              amount: amount,
+              date: _date,
+              note: _note.text.trim());
+        case AccountActionType.adjustment:
+          await widget.controller.adjust(
+              accountId: _accountId,
+              change: _adding ? amount : -amount,
+              date: _date,
+              note: _note.text.trim());
+        case AccountActionType.income:
+          await widget.controller.recordIncome(
+              accountId: _accountId,
+              amount: amount,
+              date: _date,
+              note: _note.text.trim());
       }
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -96,14 +107,20 @@ class _AccountActionPageState extends State<AccountActionPage> {
           appBar: AppBar(),
           body: const Center(child: CircularProgressIndicator()));
     }
+    final isTransfer = widget.action == AccountActionType.transfer;
+    final isIncome = widget.action == AccountActionType.income;
     final amount = double.tryParse(_amount.text.trim()) ?? 0;
     return Scaffold(
       appBar: AppBar(
-          title: Text(widget.transfer ? 'Transfer money' : 'Adjust balance')),
+          title: Text(isTransfer
+              ? 'Transfer money'
+              : isIncome
+                  ? 'Record income'
+                  : 'Adjust balance')),
       body: Form(
           key: _formKey,
           child: ListView(padding: const EdgeInsets.all(20), children: [
-            if (widget.transfer) ...[
+            if (isTransfer) ...[
               DropdownButtonFormField<int>(
                   initialValue: _fromAccountId,
                   decoration: const InputDecoration(labelText: 'From'),
@@ -131,7 +148,7 @@ class _AccountActionPageState extends State<AccountActionPage> {
               const SizedBox(height: 16),
             ] else ...[
               DropdownButtonFormField<int>(
-                  initialValue: _fromAccountId,
+                  initialValue: _accountId,
                   decoration: const InputDecoration(labelText: 'Account'),
                   items: _accounts
                       .map((account) => DropdownMenuItem(
@@ -140,26 +157,28 @@ class _AccountActionPageState extends State<AccountActionPage> {
                               '${account.name} · ${formatMoney(account.balance)}')))
                       .toList(),
                   onChanged: (value) {
-                    if (value != null) setState(() => _fromAccountId = value);
+                    if (value != null) setState(() => _accountId = value);
                   }),
-              const SizedBox(height: 18),
-              SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(
-                        value: true,
-                        label: Text('Add money'),
-                        icon: Icon(Icons.add)),
-                    ButtonSegment(
-                        value: false,
-                        label: Text('Take out'),
-                        icon: Icon(Icons.remove))
-                  ],
-                  selected: {
-                    _adding
-                  },
-                  onSelectionChanged: (values) =>
-                      setState(() => _adding = values.first)),
               const SizedBox(height: 16),
+              if (!isIncome) ...[
+                SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                          value: true,
+                          label: Text('Add money'),
+                          icon: Icon(Icons.add)),
+                      ButtonSegment(
+                          value: false,
+                          label: Text('Take out'),
+                          icon: Icon(Icons.remove))
+                    ],
+                    selected: {
+                      _adding
+                    },
+                    onSelectionChanged: (values) =>
+                        setState(() => _adding = values.first)),
+                const SizedBox(height: 16),
+              ],
             ],
             TextFormField(
                 controller: _amount,
@@ -189,10 +208,13 @@ class _AccountActionPageState extends State<AccountActionPage> {
                 controller: _note,
                 maxLength: 120,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                    labelText: 'Note (optional)',
-                    hintText: 'e.g. Starting balance or ATM withdrawal')),
-            if (widget.transfer && amount > 0 && _fromAccountId == _toAccountId)
+                decoration: InputDecoration(
+                  labelText: 'Note (optional)',
+                  hintText: isIncome
+                      ? 'e.g. Salary, refund, or allowance'
+                      : 'e.g. Starting balance or ATM withdrawal',
+                )),
+            if (isTransfer && amount > 0 && _fromAccountId == _toAccountId)
               Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text('Choose two different accounts.',
@@ -207,9 +229,11 @@ class _AccountActionPageState extends State<AccountActionPage> {
                     ? const SizedBox.square(
                         dimension: 20,
                         child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(widget.transfer
+                    : Text(isTransfer
                         ? 'Record transfer'
-                        : 'Save adjustment')),
+                        : isIncome
+                            ? 'Record income'
+                            : 'Save adjustment')),
           ])),
     );
   }
