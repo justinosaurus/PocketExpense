@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../features/analytics/presentation/analytics_page.dart';
 import '../features/accounts/presentation/account_action_page.dart';
 import '../features/accounts/presentation/account_controller.dart';
 import '../features/accounts/presentation/accounts_page.dart';
@@ -12,9 +13,15 @@ import '../features/expenses/presentation/expense_history_page.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell(
-      {super.key, required this.controller, required this.accountController});
+      {super.key,
+      required this.controller,
+      required this.accountController,
+      required this.themeMode,
+      required this.onThemeModeChanged});
   final ExpenseController controller;
   final AccountController accountController;
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode> onThemeModeChanged;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -22,6 +29,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
+  AnalyticsFocus _analyticsFocus = AnalyticsFocus.expenses;
   bool _listeningToExpenses = false;
 
   @override
@@ -80,13 +88,60 @@ class _AppShellState extends State<AppShell> {
     final pages = [
       DashboardPage(
           controller: widget.controller,
-          accountController: widget.accountController),
+          accountController: widget.accountController,
+          onOpenAnalytics: (focus) => setState(() {
+                _analyticsFocus = focus;
+                _index = 2;
+              })),
       ExpenseHistoryPage(
           controller: widget.controller,
           accountController: widget.accountController),
+      AnalyticsPage(
+        controller: widget.controller,
+        accountController: widget.accountController,
+        focus: _analyticsFocus,
+        onAddExpense: _addExpense,
+      ),
       AccountsPage(controller: widget.accountController),
     ];
     return Scaffold(
+      appBar: AppBar(
+        title: Text(_index == 2 ? 'Analytics insights' : 'Pocket Expenses'),
+        actions: [
+          PopupMenuButton<ThemeMode>(
+            tooltip: 'Choose appearance',
+            initialValue: widget.themeMode,
+            onSelected: widget.onThemeModeChanged,
+            icon: const Icon(Icons.brightness_6_outlined),
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: ThemeMode.system,
+                child: ListTile(
+                  leading: Icon(Icons.settings_brightness),
+                  title: Text('System default'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: ThemeMode.light,
+                child: ListTile(
+                  leading: Icon(Icons.light_mode_outlined),
+                  title: Text('Light'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: ThemeMode.dark,
+                child: ListTile(
+                  leading: Icon(Icons.dark_mode_outlined),
+                  title: Text('Dark'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: SafeArea(child: IndexedStack(index: _index, children: pages)),
       floatingActionButton: Row(
         mainAxisSize: MainAxisSize.min,
@@ -118,6 +173,10 @@ class _AppShellState extends State<AppShell> {
               icon: Icon(Icons.receipt_long_outlined),
               selectedIcon: Icon(Icons.receipt_long),
               label: 'History'),
+          NavigationDestination(
+              icon: Icon(Icons.insights_outlined),
+              selectedIcon: Icon(Icons.insights),
+              label: 'Analytics'),
           NavigationDestination(
               icon: Icon(Icons.account_balance_wallet_outlined),
               selectedIcon: Icon(Icons.account_balance_wallet),

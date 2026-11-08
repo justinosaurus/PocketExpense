@@ -15,5 +15,7 @@ Future<void> main() async {
   final accountController =
       AccountController(SqliteAccountRepository(database));
   runApp(ExpenseApp(
-      controller: expenseController, accountController: accountController));
+      controller: expenseController,
+      accountController: accountController,
+      database: database));
 }

@@ -121,6 +121,25 @@ void main() {
     expect(find.text('Overview'), findsOneWidget);
   });
 
+  testWidgets('theme menu allows choosing dark mode',
+      (WidgetTester tester) async {
+    final controller = ExpenseController(FakeExpenseRepository());
+    final accountController = AccountController(FakeAccountRepository());
+
+    await tester.pumpWidget(ExpenseApp(
+        controller: controller, accountController: accountController));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Choose appearance'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+        ThemeMode.dark);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Accounts page shows account actions without overflowing',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(640, 1280);

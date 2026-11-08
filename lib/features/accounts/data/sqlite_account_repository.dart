@@ -36,7 +36,9 @@ class SqliteAccountRepository implements AccountRepository {
   @override
   Future<List<AccountMovement>> getMovements() async {
     final rows = await (await _appDatabase.database).rawQuery('''
-      SELECT m.id, m.type, m.amount, m.date, m.note, f.name AS from_name, t.name AS to_name
+      SELECT m.id, m.type, m.amount, m.date, m.note,
+        m.from_account_id, m.to_account_id,
+        f.name AS from_name, t.name AS to_name
       FROM account_movements m
       LEFT JOIN accounts f ON f.id = m.from_account_id
       LEFT JOIN accounts t ON t.id = m.to_account_id
@@ -48,6 +50,8 @@ class SqliteAccountRepository implements AccountRepository {
               type: row['type'] as String,
               amount: (row['amount'] as num).toDouble(),
               date: DateTime.parse(row['date'] as String),
+              fromAccountId: row['from_account_id'] as int?,
+              toAccountId: row['to_account_id'] as int?,
               fromName: row['from_name'] as String?,
               toName: row['to_name'] as String?,
               note: row['note'] as String?,

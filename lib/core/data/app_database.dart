@@ -10,7 +10,7 @@ class AppDatabase {
     if (_database != null) return _database!;
     final path = p.join(await getDatabasesPath(), 'pocket_expenses.db');
     _database =
-        await openDatabase(path, version: 5, onCreate: (db, version) async {
+        await openDatabase(path, version: 7, onCreate: (db, version) async {
       await db.execute('''CREATE TABLE accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE
@@ -21,6 +21,7 @@ class AppDatabase {
       await _createExpensesTable(db);
       await _createExpenseIndexes(db);
       await _createMovementsTable(db);
+      await _createSettingsTable(db);
     }, onUpgrade: (db, oldVersion, newVersion) async {
       if (oldVersion < 2) {
         await db.execute('''CREATE TABLE accounts (
@@ -69,6 +70,9 @@ class AppDatabase {
         ''');
         await db.execute('DROP TABLE account_movements_before_income');
       }
+      if (oldVersion < 7) {
+        await _createSettingsTable(db);
+      }
     });
     return _database!;
   }
@@ -103,6 +107,32 @@ class AppDatabase {
       CHECK(from_account_id IS NOT NULL OR to_account_id IS NOT NULL),
       CHECK(from_account_id IS NULL OR to_account_id IS NULL OR from_account_id <> to_account_id)
     )''');
+  }
+
+  static Future<void> _createSettingsTable(Database db) async {
+    await db.execute('''CREATE TABLE app_settings (
+      setting_key TEXT PRIMARY KEY,
+      setting_value TEXT NOT NULL
+    )''');
+  }
+
+  Future<String?> getSetting(String key) async {
+    final rows = await (await database).query(
+      'app_settings',
+      columns: ['setting_value'],
+      where: 'setting_key = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first['setting_value'] as String;
+  }
+
+  Future<void> setSetting(String key, String value) async {
+    await (await database).insert(
+      'app_settings',
+      {'setting_key': key, 'setting_value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   static String _newRecordKey() {
