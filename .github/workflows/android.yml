@@ -6,7 +6,6 @@ on:
       release_tag:
         description: Release tag to create (for example, v0.1.0)
         required: true
-        default: v0.1.0
         type: string
 
 permissions:
@@ -60,6 +59,14 @@ jobs:
 
       - name: Build signed release APK
         run: flutter build apk --release --split-per-abi
+
+      - name: Rename release APKs
+        run: |
+          for apk in build/app/outputs/flutter-apk/app-*-release.apk; do
+            filename="${apk##*/}"
+            abi="${filename#app-}"
+            mv "$apk" "build/app/outputs/flutter-apk/pocket-expenses-$abi"
+          done
 
       - name: Create draft GitHub Release with APKs
         env:
